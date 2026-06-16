@@ -1,15 +1,28 @@
 {
   "name": "Elite System Names",
-  "short_name": "Elite Name",
+  "short_name": "Elite Names",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [
     {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/icon-256.png",
-      "sizes": "256x256",
-      "type": "image/png"
+      "sizes": "288x288",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
