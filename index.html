@@ -84,21 +84,37 @@ const elite_syllable_list = [
   "ra", "la", "ve", "ti", "ed", "or", "qu", "an", "te", "is",
   "ri", "on"
 ];
-
-function fnv1a_hash(s) {
-  const textEncoder = new TextEncoder();
-  const utf8_s = new Uint8Array(s.length * 3);
-  const r = textEncoder.encodeInto(s, utf8_s);
-  const fnv_prime = 2n ** 88n + 0x13bn;
-  let hash = 0x6c62272e07bb014262b821756295c58dn;
-  for (let i = 0; i < r.written; i++) {
-    hash = ((hash ^ BigInt(utf8_s[i] & 0xff)) * fnv_prime) & 0xffffffffffffffffffffffffffffffffn;
+async function pbkdf2_hash(seed) {
+  const encoder = new TextEncoder();
+  const seedBytes = encoder.encode(seed);
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    seedBytes,
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+  const salt = encoder.encode("elite-seed-salt");
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 1000,
+      hash: "SHA-256"
+    },
+    baseKey,
+    256
+  );
+  const view = new DataView(derivedBits);
+  let hash = 0n;
+  for (let i = 0; i < 16; i++) {
+    hash = (hash << 8n) | BigInt(view.getUint8(i));
   }
   return hash;
 }
 
-function generate_elite(seed) {
-  const elite_bits = fnv1a_hash(seed);
+async function generate_elite(seed) {
+  const elite_bits = await pbkdf2_hash(seed);
   let elite_system_name = '';
   let syllable_ct = 3n;
   if ((elite_bits >> 21n) & 1n) {
@@ -111,9 +127,9 @@ function generate_elite(seed) {
   return elite_system_name + '-' + elite_bits.toString().substr(1, 3);
 }
 
-function update_elite() {
+async function update_elite() {
   const seed = document.getElementById('seed').value;
-  document.getElementById('system_name').value = generate_elite(seed);
+  document.getElementById('system_name').value = await generate_elite(seed);
 }
 
 function load_history() {
@@ -163,12 +179,12 @@ function add_to_history(seed) {
   populate_history_dropdown();
 }
 
-function on_history_select() {
+async function on_history_select() {
   const select = document.getElementById('history');
   const seed = select.value;
   if (seed) {
     document.getElementById('seed').value = seed;
-    update_elite();
+    await update_elite();
   }
   // Reset to placeholder
   select.value = '';
@@ -218,9 +234,9 @@ function clear_all() {
   document.getElementById('history').value = '';
 }
 
-window.addEventListener('DOMContentLoaded', function() {
+window.addEventListener('DOMContentLoaded', async function() {
   populate_history_dropdown();
-  update_elite();
+  await update_elite();
 });
 </script>
 </head>
@@ -231,7 +247,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
     <div class="row">
       <label for="seed">Seed</label>
-      <input type="text" id="seed" oninput="update_elite()" value="john.doe@example.com">
+      <input type="text" id="seed" oninput="update_elite()">
     </div>
 
     <div class="row">
