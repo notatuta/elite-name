@@ -1,22 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="/manifest.json">
 <title>Elite Names</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #f8f9fa;
+  }
+  .container {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto 1rem auto;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+  }
+  .row label {
+    flex: 0 0 auto;
+    font-weight: 600;
+    min-width: 6rem;
+  }
+  .row input[type="text"],
+  .row select {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 16px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  .btn {
+    font-size: 16px;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .btn:active {
+    background: #e9ecef;
+  }
+  .btn-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .full-width {
+    width: 100%;
+  }
+  @media (max-width: 360px) {
+    .row label {
+      flex: 1 1 100%;
+    }
+    .row input[type="text"],
+    .row select {
+      flex: 1 1 100%;
+    }
+  }
+</style>
 <script>
 'use strict';
 
 // 32 syllables used by Elite when generating system names
 // https://www.bbcelite.com/deep_dives/generating_system_names.html
-const elite_syllable_list = ["al", "le", "xe", "ge", "za", "ce", "bi", "so", "us", "es"
-,"ar", "ma", "in", "di", "re", "a",  "er", "at", "en", "be"
-,"ra", "la", "ve", "ti", "ed", "or", "qu", "an", "te", "is"
-,"ri", "on"];
+const elite_syllable_list = [
+  "al", "le", "xe", "ge", "za", "ce", "bi", "so", "us", "es",
+  "ar", "ma", "in", "di", "re", "a",  "er", "at", "en", "be",
+  "ra", "la", "ve", "ti", "ed", "or", "qu", "an", "te", "is",
+  "ri", "on"
+];
 
-function fnv1a_hash(s)
-{
+function fnv1a_hash(s) {
   const textEncoder = new TextEncoder();
   const utf8_s = new Uint8Array(s.length * 3);
   const r = textEncoder.encodeInto(s, utf8_s);
@@ -28,9 +97,7 @@ function fnv1a_hash(s)
   return hash;
 }
 
-function update_elite(from_id, to_id)
-{
-  const seed = document.getElementById(from_id).value;
+function generate_elite(seed) {
   const elite_bits = fnv1a_hash(seed);
   let elite_system_name = '';
   let syllable_ct = 3n;
@@ -41,45 +108,154 @@ function update_elite(from_id, to_id)
     elite_system_name = elite_system_name + elite_syllable_list[(elite_bits >> (i * 5n)) & 0x1fn];
   }
   elite_system_name = elite_system_name[0].toUpperCase() + elite_system_name.substring(1);
-  document.getElementById(to_id).value = elite_system_name + '-' + elite_bits.toString().substr(1, 3);
+  return elite_system_name + '-' + elite_bits.toString().substr(1, 3);
 }
 
-function update_the_list()
-{
-  navigator.clipboard.writeText(document.getElementById('system_name').value)
+function update_elite() {
+  const seed = document.getElementById('seed').value;
+  document.getElementById('system_name').value = generate_elite(seed);
+}
 
-  // Check if identifier is already in datalist
-  let seed = document.getElementById('seed').value
-  let previously_used = document.getElementById('previously_used');
-  let already_used = false;
-  if (previously_used !== null) {
-    for (let i = 0; i < previously_used.options.length; i++) {
-      if (previously_used.options[i].value === seed) {
-        already_used = true;
-        break;
-      }
-    }
-    // Store identifier in datalist if not already there
-    if (!already_used) {
-      let option = document.createElement('option');
-      option.value = seed;
-      previously_used.appendChild(option);
-    }
+function load_history() {
+  try {
+    const raw = localStorage.getItem('elite_seed_history');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
   }
 }
 
+function save_history(seeds) {
+  try {
+    localStorage.setItem('elite_seed_history', JSON.stringify(seeds));
+  } catch (e) {
+    // Storage may be unavailable or full
+  }
+}
+
+function populate_history_dropdown() {
+  const select = document.getElementById('history');
+  const seeds = load_history();
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.text = 'Previously used seeds…';
+  placeholder.value = '';
+  select.appendChild(placeholder);
+  seeds.forEach(function(seed) {
+    const option = document.createElement('option');
+    option.value = seed;
+    option.text = seed;
+    select.appendChild(option);
+  });
+}
+
+function add_to_history(seed) {
+  if (!seed) return;
+  let seeds = load_history();
+  // Remove if already present so it moves to the top
+  seeds = seeds.filter(function(s) { return s !== seed; });
+  seeds.unshift(seed);
+  // Keep only the most recent 50
+  if (seeds.length > 50) {
+    seeds = seeds.slice(0, 50);
+  }
+  save_history(seeds);
+  populate_history_dropdown();
+}
+
+function on_history_select() {
+  const select = document.getElementById('history');
+  const seed = select.value;
+  if (seed) {
+    document.getElementById('seed').value = seed;
+    update_elite();
+  }
+  // Reset to placeholder
+  select.value = '';
+}
+
+function copy_system() {
+  const name = document.getElementById('system_name').value;
+  const seed = document.getElementById('seed').value;
+  navigator.clipboard.writeText(name).catch(function() {});
+  add_to_history(seed);
+}
+
+function copy_seeds_to_clipboard() {
+  const seeds = load_history();
+  const text = JSON.stringify(seeds, null, 2);
+  navigator.clipboard.writeText(text).catch(function() {});
+}
+
+function restore_seeds_from_clipboard() {
+  navigator.clipboard.readText().then(function(text) {
+    let seeds;
+    try {
+      seeds = JSON.parse(text);
+    } catch (e) {
+      // If not valid JSON, try treating as newline-separated
+      seeds = text.split(/\r?\n/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+    }
+    if (!Array.isArray(seeds)) {
+      seeds = [seeds];
+    }
+    // Ensure all entries are strings
+    seeds = seeds.map(function(s) { return String(s); });
+    // Filter out empty strings
+    seeds = seeds.filter(function(s) { return s.length > 0; });
+    // Limit to 50
+    if (seeds.length > 50) {
+      seeds = seeds.slice(0, 50);
+    }
+    save_history(seeds);
+    populate_history_dropdown();
+  }).catch(function() {});
+}
+
+function clear_all() {
+  document.getElementById('seed').value = '';
+  document.getElementById('system_name').value = '';
+  document.getElementById('history').value = '';
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  populate_history_dropdown();
+  update_elite();
+});
 </script>
 </head>
 <body>
-<form onsubmit="return false">
-  <p><img src="short-range_chart.png" width="256" height="248">
-  <p><label for="seed">Seed</label> <input list="previously_used" id="seed" oninput="update_elite('seed', 'system_name')">
-  <input type="reset" value="Clear">
-  <datalist id="previously_used">
-    <option>john.doe@example.com</option>
-  </datalist> 
-  <p><label for="system_name">System name</label> <input type="text" id="system_name"  size="11" readonly>
-  <input type="button" value="Copy" onClick="update_the_list()">
-</form>
+<div class="container">
+  <form onsubmit="return false">
+    <img src="short-range_chart.png" width="256" height="248" alt="Short range chart">
+
+    <div class="row">
+      <label for="seed">Seed</label>
+      <input type="text" id="seed" oninput="update_elite()" value="john.doe@example.com">
+    </div>
+
+    <div class="row">
+      <label for="history">History</label>
+      <select id="history" onchange="on_history_select()">
+        <option value="">Previously used seeds…</option>
+      </select>
+    </div>
+
+    <div class="row btn-group">
+      <button type="button" class="btn" onclick="copy_seeds_to_clipboard()">Copy seeds to clipboard</button>
+      <button type="button" class="btn" onclick="restore_seeds_from_clipboard()">Restore seeds from clipboard</button>
+    </div>
+
+    <div class="row">
+      <label for="system_name">System</label>
+      <input type="text" id="system_name" readonly>
+    </div>
+
+    <div class="row btn-group">
+      <button type="button" class="btn" onclick="clear_all()">Clear</button>
+      <button type="button" class="btn" onclick="copy_system()">Copy System</button>
+    </div>
+  </form>
+</div>
 </body>
 </html>
